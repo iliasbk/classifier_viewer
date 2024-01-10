@@ -1,4 +1,4 @@
-package vizualiser;
+package viewer;
 
 import java.awt.Color;
 import java.awt.Dimension;

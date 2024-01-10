@@ -1,4 +1,4 @@
-package vizualiser;
+package viewer;
 
 public interface Observer {
 	

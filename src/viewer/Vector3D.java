@@ -1,4 +1,4 @@
-package vizualiser;
+package viewer;
 
 public class Vector3D {
 	
