@@ -26,12 +26,14 @@ public class NnHandler implements Runnable {
 	public int dataClassesNb = 4;
 	int clustersPerClass = 3;
 	int classSize = 1000;
-	double classDispersionCoeff = 8;
-	double classDensityCoeff = 4;
+	double classDispersionCoeff = 0.3;
+	double classDensityCoeff = 0.25;
 
-	public final int DATA_SIZE = classSize * clustersPerClass * dataClassesNb;
+	int dataSize;
+	int trainingDataSize;
+	int testDataSize;
+	double testTrainingDataProportion = 0.3;
 	
-
 	int classRadius;
 	
 	double w;
@@ -41,6 +43,8 @@ public class NnHandler implements Runnable {
 	LearningModule learningMod;
 	
 	public ArrayList<Vector3D> data;
+	public ArrayList<Vector3D> trainingData;
+	public HashSet<Vector3D> testData;
 	
 	int dataPointer = 0;
 	
@@ -51,31 +55,47 @@ public class NnHandler implements Runnable {
 	HashSet<Observer> viewers;
 	
 	boolean doTrain = false;
-	boolean trainStarted = false;
+	boolean isTraining = false;
 	
-	int currentSuccessRate = 0;
+	int currentSuccessRate;
 	
 	public NnHandler(double maxW, double maxH) {
 		this.w = maxW;
 		this.h = maxH;
 		
-		classRadius = (int) (Math.min(maxW, maxH)/classDispersionCoeff);
-				
-		data = new ArrayList<Vector3D>(DATA_SIZE);
-		
-		generateData(maxW, maxH);
-		initNet();
-		
-		learningMod = new LearningModule(net);
-		
-		successHistory = new LinkedList<Boolean>();
+		initAll();
 		
 		viewers = new HashSet<Observer>();
 		
+		computeTestSuccessRate();
+		notifyViewers();
+	}
+	
+	void initAll() {
+		generateData(w, h);
+		initNet();	
+		successHistory = new LinkedList<Boolean>();
+		currentSuccessRate = 0;
+	}
+	
+	void computeClassRadius() {
+		classRadius = (int) (Math.min(w, h)/2*classDispersionCoeff);
+	}
+	
+	void computeDataSize() {
+		dataSize = classSize * clustersPerClass * dataClassesNb;
+		trainingDataSize = (int) (dataSize/(1+testTrainingDataProportion));
+		testDataSize = dataSize - trainingDataSize;
 	}
 	
 	void generateData(double maxW, double maxH) {
 		
+		computeDataSize();
+		computeClassRadius();
+		
+		data = new ArrayList<Vector3D>(dataSize);
+		trainingData = new ArrayList<Vector3D>(trainingDataSize);
+		testData = new HashSet<Vector3D>(testDataSize);
 		
 		double genZoneW = maxW-classRadius*2;
 		double genZoneH = maxH-classRadius*2;
@@ -93,7 +113,7 @@ public class NnHandler implements Runnable {
 				// distribute data around the center
 
 				for(int p=0; p<classSize; p++) {
-					double pos = Math.pow(Math.random(),classDensityCoeff) * classRadius;
+					double pos = Math.pow(Math.random(),1/classDensityCoeff) * classRadius;
 					double theta = Math.random() * Math.PI * 2;
 					
 					double x = Math.cos(theta) * pos + centerX;
@@ -105,7 +125,38 @@ public class NnHandler implements Runnable {
 				}
 			}
 		}
+		
+		separateSets();
+	}	
+	
+	void separateSets() {
+		trainingData = (ArrayList<Vector3D>) data.clone();
+		for(int c=0;c<testDataSize;c++) {
+			int i = (int)(Math.random() * (dataSize-c));
+			testData.add(trainingData.remove(i));
+		}
+	}
+	
+	public void regenData(int dataClassesNb, int clustersPerClass, int classSize, double classDispersionCoeff, double classDensityCoeff) {
+		boolean temp = doTrain;
+		doTrain = false;
+		
+		while(isTraining)
+			try {
+				Thread.sleep(1);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			};
+		
+		this.dataClassesNb = dataClassesNb;
+		this.clustersPerClass = clustersPerClass;
+		this.classSize = classSize;
+		this.classDispersionCoeff = classDispersionCoeff;
+		this.classDensityCoeff = classDensityCoeff;
 
+		initAll();
+		
+		doTrain = temp;
 	}
 
 	void initNet() {
@@ -115,7 +166,7 @@ public class NnHandler implements Runnable {
 			
 			if(NB_HIDDEN_NEURONS > 0) {
 				
-				LayerLinear layer1 = new LayerLinear(NB_HIDDEN_NEURONS);
+				LayerSigmoid layer1 = new LayerSigmoid(NB_HIDDEN_NEURONS);
 				net.addLayer(layer1);
 				LayerSigmoid layer2 = new LayerSigmoid(NB_HIDDEN_NEURONS);
 				net.addLayer(layer2);
@@ -129,6 +180,9 @@ public class NnHandler implements Runnable {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		
+
+		learningMod = new LearningModule(net);
 	}
 	
 	public int computeClass(double x, double y) {
@@ -146,45 +200,37 @@ public class NnHandler implements Runnable {
 	}
 	
 	public void trainNext() {
+		isTraining = true;
 		
 		Vector3D point;
 		
-		int i = (int)(Math.random() * DATA_SIZE);
+		int i = (int)(Math.random() * trainingDataSize);
 		
 		if(feedClass < 0) {
-			point = data.get(i);
+			point = trainingData.get(i);
 		} else {
-			for(; data.get(i).z != feedClass; i = (++i)%DATA_SIZE);
-			point = data.get(i);
+			for(; trainingData.get(i).z != feedClass; i = (++i)%trainingDataSize);
+			point = trainingData.get(i);
 		}
 		
 		// normalize
-//		double x = point.x / w;
-//		double y = point.y / h;
 		int z = (int) point.z;
-//		
-//		Double[] inputs = new Double[] {x, y};
+		
 		Double[] expectedOut = new Double[dataClassesNb];
 		Arrays.fill(expectedOut, 0.0);
 		expectedOut[z] = 1.0;
-//		
-//		Double[] out = net.compute(inputs);
-//		boolean classified = outToClass(out) == point.z;
 		
 		int out = computeClass(point.x, point.y);
-		boolean classified = out == z;
-		
-		addToHistory(classified);
 		
 		// train
-		try {
-			learningMod.propagateSquaredDifference(expectedOut);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+		learningMod.propagateSquaredDifference(expectedOut);
 
+		
+		boolean classified = out == z;
+		addToHistory(classified);
 		notifyViewers();
 		
+		isTraining = false;
 	}
 	
 	public void feedClass(int index) {
@@ -226,7 +272,7 @@ public class NnHandler implements Runnable {
 	}
 	
 	public void addToHistory(boolean val) {
-		if(successHistory.size() >= DATA_SIZE)
+		if(successHistory.size() >= trainingDataSize)
 			successHistory.remove();
 		successHistory.add(val);
 	}
@@ -235,24 +281,21 @@ public class NnHandler implements Runnable {
 		successHistory.clear();
 	}
 
-	public int getCombinedSuccessRate() {
+	public int getTrainingSuccessRate() {
 		double sum = 0;
 		for(boolean e : successHistory)
 			sum += e ? 1 : 0;
-		return (int) (sum/DATA_SIZE * 100);
+		return (int) (sum/trainingDataSize * 100);
 	}
 	
-	public void updateSuccessRate() {
+	public void computeTestSuccessRate() {
 		int c = 0;
-		for(Vector3D point : data) {
+		for(Vector3D point : testData) {
 			int z = computeClass(point.x, point.y);
 			if(z == point.z)
 				c++;
 		}
-		currentSuccessRate = (int) ((double)c/(double)DATA_SIZE * 100);
-		notifyViewers();
-		
-		System.out.println(currentSuccessRate);
+		currentSuccessRate = (int) ((double)c/(double)testDataSize * 100);
 	}
 	
 	@Override
@@ -278,8 +321,8 @@ public class NnHandler implements Runnable {
 	}
 	
 	private void notifyViewers() {
-		int combinedRate = getCombinedSuccessRate();
-		viewers.forEach(x -> x.notify(combinedRate, currentSuccessRate));
+		int trainingRate = getTrainingSuccessRate();
+		viewers.forEach(x -> x.notify(trainingRate, currentSuccessRate));
 	}
 	
 	public void subscribe(Observer v) {

@@ -9,6 +9,7 @@ import java.awt.event.MouseEvent;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Line2D;
 import java.awt.geom.Rectangle2D;
+import java.util.Collection;
 
 import javax.swing.JPanel;
 
@@ -33,16 +34,18 @@ public class GraphicPane extends JPanel implements Runnable {
 	
 	NnHandler nnHandler;
 	
-	double colorDiff;
-	
 	public boolean drawZones = true;
+	public boolean drawData = true;
+	public boolean drawTestData = false;
+	public boolean drawTrainingData = false;
+	
 	public boolean drawDistribution;
 	
 	boolean doPaint = false;
 	
 	int[][] zones;
 	
-	Thread zonesProc;
+//	Thread zonesProc;
 
 	public GraphicPane(App app, double w, double h, double pxlPerUnit, NnHandler nnHandler) {
 		this.app = app;
@@ -55,25 +58,7 @@ public class GraphicPane extends JPanel implements Runnable {
 		this.pointSize /= pxlPerUnit;
 		this.nnHandler = nnHandler;
 		
-		this.colorDiff = 255 / nnHandler.dataClassesNb;
-		
 		this.zones = new int[(int) h+1][(int) w+1];
-
-		this.zonesProc = new Thread() {
-			public void run() {
-				while(true) {
-					
-					if(doPaint)
-						computeZones();
-					
-					try {
-						Thread.sleep(200);
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
-				}
-			}
-		};
 		
 		addMouseListener(new MouseAdapter() {
 			public void mouseClicked(MouseEvent e) {
@@ -82,7 +67,7 @@ public class GraphicPane extends JPanel implements Runnable {
 		});
 	}
 	
-	void processClick(double x, double y) {
+	private void processClick(double x, double y) {
 		
 		// transform click pos to graphic coords
 		x /= pxlPerUnit;
@@ -96,14 +81,14 @@ public class GraphicPane extends JPanel implements Runnable {
 		System.out.println("class " + pointClass);
 	}
 	
-	Color zToColor(double z) {
+	private Color zToColor(double z) {
 		if(z < 0)
 			return Color.red;
-		int c = (int) (255 - z*colorDiff);
+		int c = (int) (255 - z * (255 / nnHandler.dataClassesNb));
 		return new Color(c, c, c);
 	}
 	
-	Color interpolateColor(Double[] distribution) {
+	private Color interpolateColor(Double[] distribution) {
 		
 		int r=0;
 		int g=0;
@@ -165,14 +150,26 @@ public class GraphicPane extends JPanel implements Runnable {
 	}
 	
 	private void drawData(Graphics2D g2d) {
-		Ellipse2D.Double point = new Ellipse2D.Double(0, 0, pointSize, pointSize);
 		
-		for(Vector3D p : nnHandler.data) {
+		if(drawData) {
+			Ellipse2D.Double point = new Ellipse2D.Double(0, 0, pointSize, pointSize);
+			Color c;
 			
-			g2d.setColor(zToColor(p.z));
-			g2d.translate(p.x, p.y);
-			g2d.draw(point);
-			g2d.translate(-p.x, -p.y);
+			for(Vector3D p : nnHandler.data) {
+				boolean contains = nnHandler.testData.contains(p);
+
+				c = zToColor(p.z);
+				
+				if(drawTestData && contains)
+					c = Color.red;
+				if(drawTrainingData && !contains)
+					c = Color.green;
+					
+				g2d.setColor(c);
+				g2d.translate(p.x, p.y);
+				g2d.draw(point);
+				g2d.translate(-p.x, -p.y);
+			}
 		}
 	}
 	
@@ -282,6 +279,7 @@ public class GraphicPane extends JPanel implements Runnable {
 			if(doPaint) {
 				computeZones();
 				repaint();
+				nnHandler.computeTestSuccessRate();
 			}
 			
 			try {
@@ -294,7 +292,6 @@ public class GraphicPane extends JPanel implements Runnable {
 	}
 	
 	public void start() {
-//		zonesProc.start();
 		PROC.start();
 	}
 	
@@ -304,6 +301,21 @@ public class GraphicPane extends JPanel implements Runnable {
 	
 	public void drawZones(boolean doDraw) {
 		drawZones = doDraw;
+		repaint();
+	}
+	
+	public void drawData(boolean doDraw) {
+		drawData = doDraw;
+		repaint();
+	}
+	
+	public void drawTestData(boolean doDraw) {
+		drawTestData = doDraw;
+		repaint();
+	}
+	
+	public void drawTrainingData(boolean doDraw) {
+		drawTrainingData = doDraw;
 		repaint();
 	}
 }
