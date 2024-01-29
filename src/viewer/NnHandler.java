@@ -6,11 +6,13 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Queue;
 
+import layers.Layer;
 import layers.LayerLinear;
 import layers.LayerSigmoid;
 import learning_module.LearningModule;
 import neural_net.Network;
 import nn_interface.Node;
+import tools.NodeFactory;
 import units.Type;
 import units.Unit;
 
@@ -21,7 +23,20 @@ public class NnHandler implements Runnable {
 	/** 1st - X, 2nd - Y */
 	final int NB_INPUTS = 2;
 	
-	public final int NB_HIDDEN_NEURONS = 10;
+	double w;
+	double h;
+	
+	Network net;
+	LearningModule learningMod;
+	
+	public int neuronsPerLayer = 10;
+	
+	public ArrayList<Type> layerTypes;
+	final int DEFAULT_LAYER_NB = 3;
+	
+	public ArrayList<Vector3D> data;
+	public ArrayList<Vector3D> trainingData;
+	public HashSet<Vector3D> testData;
 	
 	public int dataClassesNb = 4;
 	int clustersPerClass = 3;
@@ -36,32 +51,23 @@ public class NnHandler implements Runnable {
 	
 	int classRadius;
 	
-	double w;
-	double h;
-	
-	Network net;
-	LearningModule learningMod;
-	
-	public ArrayList<Vector3D> data;
-	public ArrayList<Vector3D> trainingData;
-	public HashSet<Vector3D> testData;
-	
 	int dataPointer = 0;
 	
 	int feedClass = -1;
 
 	Queue<Boolean> successHistory;
+	int currentSuccessRate;
 	
 	HashSet<Observer> viewers;
 	
 	boolean doTrain = false;
 	boolean isTraining = false;
 	
-	int currentSuccessRate;
-	
 	public NnHandler(double maxW, double maxH) {
 		this.w = maxW;
-		this.h = maxH;
+		this.h = maxH;	
+
+		initLayers();
 		
 		initAll();
 		
@@ -139,14 +145,8 @@ public class NnHandler implements Runnable {
 	
 	public void regenData(int dataClassesNb, int clustersPerClass, int classSize, double classDispersionCoeff, double classDensityCoeff) {
 		boolean temp = doTrain;
-		doTrain = false;
 		
-		while(isTraining)
-			try {
-				Thread.sleep(1);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			};
+		endTraining();
 		
 		this.dataClassesNb = dataClassesNb;
 		this.clustersPerClass = clustersPerClass;
@@ -159,30 +159,33 @@ public class NnHandler implements Runnable {
 		doTrain = temp;
 	}
 
+	void initLayers() {
+		layerTypes = new ArrayList<Type>();
+		for(int i=0; i<DEFAULT_LAYER_NB; i++)
+			layerTypes.add(Type.SIGMOID);
+	}
+	
 	void initNet() {
+		boolean temp = doTrain;
+		endTraining();
 		try {
 			
 			net = new Network(Type.SIGMOID, dataClassesNb);
 			
-			if(NB_HIDDEN_NEURONS > 0) {
-				
-				LayerSigmoid layer1 = new LayerSigmoid(NB_HIDDEN_NEURONS);
-				net.addLayer(layer1);
-				LayerSigmoid layer2 = new LayerSigmoid(NB_HIDDEN_NEURONS);
-				net.addLayer(layer2);
-				LayerSigmoid layer3 = new LayerSigmoid(NB_HIDDEN_NEURONS);
-				net.addLayer(layer3);
-				
-			}
-			
+			if(neuronsPerLayer > 0) 
+				for(Type type : layerTypes) 
+					net.addLayer(NodeFactory.createLayer(type, neuronsPerLayer));
+
 			net.initConnections(NB_INPUTS);
 			
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		
 
 		learningMod = new LearningModule(net);
+		
+		System.out.println(layerTypes.toString());
+		doTrain = temp;
 	}
 	
 	public int computeClass(double x, double y) {
@@ -239,7 +242,7 @@ public class NnHandler implements Runnable {
 	
 	public Unit[] getHiddenNeurons() {
 		Node[] nodes = net.getLayer(0).getNodes();
-		Unit[] units = new Unit[NB_HIDDEN_NEURONS];
+		Unit[] units = new Unit[neuronsPerLayer];
 		
 		for(int i=0; i<nodes.length; i++)
 			units[i] = (Unit) nodes[i];
@@ -318,6 +321,16 @@ public class NnHandler implements Runnable {
 	
 	public void train() {
 		doTrain = !doTrain;
+	}
+	
+	private void endTraining() {
+		doTrain = false;
+		while(isTraining)
+			try {
+				Thread.sleep(1);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			};
 	}
 	
 	private void notifyViewers() {

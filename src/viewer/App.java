@@ -65,7 +65,6 @@ public class App extends JFrame{
 	private void initGpn() {
 		gpn = new GraphicPane(this, GRAPHIC_MAX_WIDTH, GRAPHIC_MAX_HEIGHT, PXL_PER_UNIT, nnHandler);
 		gpn.setBounds(0,0,GRAPHIC_PANE_WIDTH, GRAPHIC_PANE_HEIGHT);
-		gpn.setBackground(Color.green);
 		contentPane.add(gpn);
 	}
 	

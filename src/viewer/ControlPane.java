@@ -1,12 +1,17 @@
 package viewer;
 
+import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.ComponentOrientation;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
+import java.util.ArrayList;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -14,11 +19,14 @@ import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JSpinner;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.border.Border;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+
+import units.Type;
 
 public class ControlPane extends JPanel implements Observer {
 
@@ -359,15 +367,27 @@ public class ControlPane extends JPanel implements Observer {
 						(double)spnClassDensityCoeff.getValue()
 						);
 
+				gpn.regen();
+				
 				btnTrain.setText(nnh.doTrain? "Stop" : "Train");
 				
 				nnh.computeTestSuccessRate();
 				
-				gpn.repaint();
 			}
 		});
 		
 	}
+	
+	JScrollPane pnlLayers;
+	
+	JLabel lblNbLayers;
+	
+	JSpinner spnNbLayers;
+	
+	JButton btnResetNet;
+	
+	final int MIN_LAYERS = 1;
+	final int MAX_LAYERS = 10;
 	
 	private void initNetworkPane() {
 		pnlNetwork = new JPanel();
@@ -378,6 +398,97 @@ public class ControlPane extends JPanel implements Observer {
 		lblNetwork.setFont(new Font("", Font.BOLD, 20));
 		lblNetwork.setBounds(10,10,100,20);
 		pnlNetwork.add(lblNetwork);
+		
+		lblNbLayers = new JLabel("Number of layers");
+		lblNbLayers.setBounds(10, 50, 100, 20);
+		pnlNetwork.add(lblNbLayers);
+
+		
+		spnNbLayers = new JSpinner(new SpinnerNumberModel(nnh.DEFAULT_LAYER_NB, MIN_CLUSSTERS, MAX_CLUSSTERS, 1));
+		spnNbLayers.setBounds(120, 50, 60, 25);
+		pnlNetwork.add(spnNbLayers);
+		
+		spnNbLayers.addChangeListener(new ChangeListener() {
+			@Override
+			public void stateChanged(ChangeEvent e) {
+				int val = (int) spnNbLayers.getValue();
+				if(val < nnh.layerTypes.size())
+					nnh.layerTypes = new ArrayList<Type>(nnh.layerTypes.subList(0, val));
+				else if(val > nnh.layerTypes.size())
+					nnh.layerTypes.add(Type.SIGMOID);
+				
+				System.out.println(nnh.layerTypes.size());
+				
+				generateLayerList();
+			}
+		});
+		
+		
+		JLabel lblLayerPaneNum = new JLabel("Layer");
+		lblLayerPaneNum.setBounds(20,80,50,20);
+		pnlNetwork.add(lblLayerPaneNum);
+		
+		JLabel lblLayerPaneType = new JLabel("Type");
+		lblLayerPaneType.setBounds(85,80,50,20);
+		pnlNetwork.add(lblLayerPaneType);
+
+		
+		pnlLayers = new JScrollPane(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+		pnlLayers.setBounds(10,100,170,100);
+		pnlNetwork.add(pnlLayers);
+		
+		generateLayerList();
+		
+		
+		btnResetNet = new JButton("Update Network");
+		btnResetNet.setBounds(10,205, 170, 25);
+		pnlNetwork.add(btnResetNet);
+		
+		btnResetNet.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				nnh.initNet();
+			}
+		});
+	}
+	
+	private void generateLayerList() {
+		JPanel p = new JPanel();
+		p.setLayout(new GridLayout(0,1,0,5));
+		
+		int layerWindowSize = 30;
+
+		Type[] choices = {Type.LINEAR, Type.SIGMOID};
+		
+		for (int i = 0; i < nnh.layerTypes.size(); i++) {
+			JPanel layer = new JPanel();
+			layer.setBackground(new Color(220,220,220));
+			layer.setBounds(0,0,p.getWidth(),layerWindowSize);
+			layer.setPreferredSize(new Dimension(p.getWidth(), layerWindowSize));
+			layer.setLayout(new FlowLayout(FlowLayout.LEFT, 25, 2));
+			
+			JLabel lblNum = new JLabel((i+1)+"");
+			layer.add(lblNum, BorderLayout.PAGE_START);
+			
+			Type layerType = nnh.layerTypes.get(i);
+			
+			JComboBox<Type> cmbxTypes = new JComboBox<Type>(choices);
+			cmbxTypes.setSelectedItem(layerType);
+			layer.add(cmbxTypes);
+			
+			int a = i;
+			
+			cmbxTypes.addActionListener(new ActionListener() {
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					nnh.layerTypes.set(a, (Type)cmbxTypes.getSelectedItem());
+				}
+			});
+			
+            p.add(layer);
+        }
+		
+		pnlLayers.setViewportView(p);
 	}
 	
 	private String[] getClassOptions() {

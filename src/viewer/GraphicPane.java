@@ -9,7 +9,9 @@ import java.awt.event.MouseEvent;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Line2D;
 import java.awt.geom.Rectangle2D;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.stream.Stream;
 
 import javax.swing.JPanel;
 
@@ -45,9 +47,12 @@ public class GraphicPane extends JPanel implements Runnable {
 	
 	int[][] zones;
 	
+	Color[] classColors;
+	
 //	Thread zonesProc;
 
 	public GraphicPane(App app, double w, double h, double pxlPerUnit, NnHandler nnHandler) {
+		setBackground(new Color(50,50,50));
 		this.app = app;
 		this.w = w;
 		this.h = h;
@@ -59,6 +64,8 @@ public class GraphicPane extends JPanel implements Runnable {
 		this.nnHandler = nnHandler;
 		
 		this.zones = new int[(int) h+1][(int) w+1];
+		
+		initColors();
 		
 		addMouseListener(new MouseAdapter() {
 			public void mouseClicked(MouseEvent e) {
@@ -81,11 +88,21 @@ public class GraphicPane extends JPanel implements Runnable {
 		System.out.println("class " + pointClass);
 	}
 	
-	private Color zToColor(double z) {
-		if(z < 0)
-			return Color.red;
-		int c = (int) (255 - z * (255 / nnHandler.dataClassesNb));
-		return new Color(c, c, c);
+	private void initColors() {
+		classColors = new Color[nnHandler.dataClassesNb];
+		for(int i=0;i<nnHandler.dataClassesNb;i++) {
+			classColors[i] = new Color(
+					(int)(Math.random() * 200)+50,
+					(int)(Math.random() * 200)+50,
+					(int)(Math.random() * 200)+50
+					);
+		}
+	}
+	
+	private Color zToZoneColor(double z) {
+		Color c = classColors[(int)z];
+		int r = 20;
+		return new Color(c.getRed()-r, c.getGreen()-r, c.getBlue()-r);
 	}
 	
 	private Color interpolateColor(Double[] distribution) {
@@ -94,9 +111,9 @@ public class GraphicPane extends JPanel implements Runnable {
 		int g=0;
 		int b=0;
 		
-		for(int c=0; c<2; c++) {
+		for(int c=0; c<distribution.length; c++) {
 			
-			Color color = zToColor(c);
+			Color color = classColors[c];
 			
 			r += distribution[c] * color.getRed();
 			g += distribution[c] * color.getGreen();
@@ -127,7 +144,7 @@ public class GraphicPane extends JPanel implements Runnable {
 		
 		// draw axis
 		
-		g2d.setColor(Color.black);
+		g2d.setColor(Color.white);
 		g2d.setStroke(new BasicStroke((float) (1/pxlPerUnit)));
 		
 		Line2D.Double xAxis = new Line2D.Double(-originX, 0, originX, 0);
@@ -158,7 +175,9 @@ public class GraphicPane extends JPanel implements Runnable {
 			for(Vector3D p : nnHandler.data) {
 				boolean contains = nnHandler.testData.contains(p);
 
-				c = zToColor(p.z);
+//				c = zToColor(p.z);
+//				c = classColors[(int) p.z];
+				c = zToZoneColor(p.z);
 				
 				if(drawTestData && contains)
 					c = Color.red;
@@ -205,9 +224,7 @@ public class GraphicPane extends JPanel implements Runnable {
 			for(int x=xi; x < w/2; x++) {
 				
 				int z = zones[y+yi][x-xi];
-				Color color = zToColor(z);
-				Color transformedColor = new Color(color.getRed(), color.getGreen(), color.getBlue());
-				g2d.setColor(transformedColor);
+				g2d.setColor(classColors[z]);
 				g2d.fill(pixel);
 				
 				g2d.translate(1, 0);
@@ -234,17 +251,15 @@ public class GraphicPane extends JPanel implements Runnable {
 				
 				Double[] out = netClone.compute(new Double[] {(double)x, (double)y});
 				
-				Color color = interpolateColor(out);
-				
-				Color transformedColor = new Color(color.getRed(), color.getGreen(), color.getBlue());
-				g2d.setColor(transformedColor);
+				g2d.setColor(interpolateColor(out));
 				g2d.fill(pixel);
 				
 				g2d.translate(1, 0);
 			}
 			g2d.translate(-w, -1);
 		}	
-		
+
+		g2d.translate(0, h);
 	}
 	
 	private void computeZones() {
@@ -316,6 +331,11 @@ public class GraphicPane extends JPanel implements Runnable {
 	
 	public void drawTrainingData(boolean doDraw) {
 		drawTrainingData = doDraw;
+		repaint();
+	}
+	
+	public void regen() {
+		initColors();
 		repaint();
 	}
 }
