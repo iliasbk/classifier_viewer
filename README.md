@@ -9,6 +9,7 @@ This project intends to dynamically create two input classifiers and visualize t
 <br>The application allows users dynamically modify the classifier by adding or removing layers from the network, and select the activation function for each.
 <br>Here the classifier is simply a neural network with two inputs corresponding to the data value pair.
 <br>They learn the class distribution by minimising the squared error loss function.
+<br>The output is a vector with the same number of elements as the number of classes. Each vector element represents the probability that a certain input pair of values pertains to the class corresponding to the position of the element in the vector.
 
 # Preview
 [![SC2 Video](res/preview.gif)]([https://www.youtube.com/watch?v=--b-9HrKK6w](https://www.youtube.com/watch?v=-TkSJH7p__k)https://www.youtube.com/watch?v=-TkSJH7p__k)
